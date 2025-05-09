@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}YouTube Downloader - Download Status{% endblock %}
+
+{% block head %}
+<meta id="download-id" data-id="{{ download_id }}">
+<style>
+.progress {
+    height: 20px;
+}
+.progress-bar {
+    transition: width 0.5s ease-in-out;
+}
+.progress-bar[data-progress] {
+    width: attr(data-progress);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h2 class="mb-0">
+                    <i class="fas fa-download me-2"></i>Download Status
+                </h2>
+            </div>
+            <div class="card-body">
+                <h3 id="video-title">{{ download.title }}</h3>
+                <p id="download-type-info">
+                    <i class="fas {% if download.type == 'audio' %}fa-music{% else %}fa-video{% endif %} me-1"></i>
+                    Downloading as {% if download.type == 'audio' %}MP3 Audio{% else %}Video{% endif %}
+                </p>
+                
+                <div id="status-container" class="mt-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3">
+                            <span id="status-badge" class="badge bg-info">{{ download.status }}</span>
+                        </div>
+                        <div>
+                            <span id="status-text">
+                                {% if download.status == 'queued' %}
+                                    Waiting in queue...
+                                {% elif download.status == 'extracting' %}
+                                    Extracting media information...
+                                {% elif download.status == 'downloading' %}
+                                    Downloading...
+                                {% elif download.status == 'processing' %}
+                                    {% if download.type == 'audio' %}
+                                        Converting to MP3...
+                                    {% else %}
+                                        Processing media...
+                                    {% endif %}
+                                {% elif download.status == 'complete' %}
+                                    Download complete!
+                                {% elif download.status == 'error' %}
+                                    Error: {{ download.error }}
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div id="progress-container" class="mb-3">
+                        <div class="progress">
+                            <div id="progress-bar" 
+                                class="progress-bar progress-bar-striped progress-bar-animated" 
+                                role="progressbar" 
+                                data-progress="{{ download.progress }}"
+                                aria-valuenow="{{ download.progress|replace('%', '') }}"
+                                aria-valuemin="0"
+                                aria-valuemax="100">
+                                {{ download.progress }}
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-2">
+                            <small id="speed-text">Speed: {{ download.speed }}</small>
+                            <small id="eta-text">ETA: {{ download.eta }}</small>
+                        </div>
+                    </div>
+                    
+                    <div id="download-actions" class="mt-4">
+                        {% if download.status == 'complete' %}
+                            <a href="{{ url_for('get_file', download_id=download_id) }}" class="btn btn-success">
+                                <i class="fas {% if download.type == 'audio' %}fa-music{% else %}fa-save{% endif %} me-2"></i>
+                                Save {% if download.type == 'audio' %}MP3{% else %}Video{% endif %}
+                            </a>
+                        {% endif %}
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                            <i class="fas fa-home me-2"></i>Back to Home
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Only update if not complete
+        if ('{{ download.status }}' !== 'complete' && '{{ download.status }}' !== 'error') {
+            // Get download ID
+            const downloadId = document.getElementById('download-id').dataset.id;
+            
+            // Update status every 1 second
+            setInterval(function() {
+                fetch('/check_status/' + downloadId)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update UI with new status
+                        document.getElementById('status-badge').textContent = data.status;
+                        document.getElementById('status-badge').className = 'badge ' + getStatusBadgeClass(data.status);
+                        
+                        // Update progress
+                        if (data.status === 'downloading') {
+                            document.getElementById('status-text').textContent = 'Downloading...';
+                            const progressBar = document.getElementById('progress-bar');
+                            progressBar.style.width = data.progress;
+                            progressBar.dataset.progress = data.progress;
+                            progressBar.textContent = data.progress;
+                            progressBar.setAttribute('aria-valuenow', data.progress.replace('%', ''));
+                            document.getElementById('speed-text').textContent = 'Speed: ' + data.speed;
+                            document.getElementById('eta-text').textContent = 'ETA: ' + data.eta;
+                        } 
+                        else if (data.status === 'processing') {
+                            if (data.type === 'audio') {
+                                document.getElementById('status-text').textContent = 'Converting to MP3...';
+                            } else {
+                                document.getElementById('status-text').textContent = 'Processing media...';
+                            }
+                        }
+                        else if (data.status === 'extracting') {
+                            document.getElementById('status-text').textContent = 'Extracting media information...';
+                        }
+                        else if (data.status === 'complete') {
+                            document.getElementById('status-text').textContent = 'Download complete!';
+                            
+                            // Add download button
+                            const actionsDiv = document.getElementById('download-actions');
+                            const isAudio = data.type === 'audio';
+                            actionsDiv.innerHTML = `
+                                <a href="/get_file/${downloadId}" class="btn btn-success">
+                                    <i class="fas ${isAudio ? 'fa-music' : 'fa-save'} me-2"></i>Save ${isAudio ? 'MP3' : 'Video'}
+                                </a>
+                                <a href="/" class="btn btn-secondary">
+                                    <i class="fas fa-home me-2"></i>Back to Home
+                                </a>
+                            `;
+                            
+                            // Reload to stop polling
+                            window.location.reload();
+                        }
+                        else if (data.status === 'error') {
+                            document.getElementById('status-text').textContent = 'Error: ' + data.error;
+                            
+                            // Reload to stop polling
+                            window.location.reload();
+                        }
+                        
+                        // Update title if available
+                        if (data.title && data.title !== document.getElementById('video-title').textContent) {
+                            document.getElementById('video-title').textContent = data.title;
+                        }
+                        
+                        // Update download type info
+                        if (data.type) {
+                            const isAudio = data.type === 'audio';
+                            document.getElementById('download-type-info').innerHTML = `
+                                <i class="fas ${isAudio ? 'fa-music' : 'fa-video'} me-1"></i>
+                                Downloading as ${isAudio ? 'MP3 Audio' : 'Video'}
+                            `;
+                        }
+                    })
+                    .catch(error => console.error('Error checking status:', error));
+            }, 1000);
+        }
+    });
+    
+    function getStatusBadgeClass(status) {
+        switch(status) {
+            case 'queued': return 'bg-secondary';
+            case 'extracting': return 'bg-info';
+            case 'downloading': return 'bg-primary';
+            case 'processing': return 'bg-warning';
+            case 'complete': return 'bg-success';
+            case 'error': return 'bg-danger';
+            default: return 'bg-secondary';
+        }
+    }
+</script>
+{% endblock %} 

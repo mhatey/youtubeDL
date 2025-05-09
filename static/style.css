@@ -1,0 +1,50 @@
+/* Custom styles for YouTube Downloader */
+
+body {
+    background-color: #f8f9fa;
+}
+
+.card {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.card-header {
+    font-weight: bold;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.4rem;
+}
+
+.progress {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+footer {
+    border-top: 1px solid #dee2e6;
+}
+
+/* Animation for loading state */
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+.status-loading {
+    animation: pulse 1.5s infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .card-header h3 {
+        font-size: 1.3rem;
+    }
+} 

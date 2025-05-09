@@ -1,0 +1,3 @@
+yt-dlp>=2023.3.4
+flask>=2.0.0
+# FFmpeg must be installed on the system for MP3 extraction 
